@@ -4,15 +4,14 @@ from groq import Groq
 
 app = Flask(__name__)
 
-# 1. Сначала проверяем переменную окружения (для Render)
+# 1. Проверяем переменную окружения (для хостинга Render)
 api_key = os.environ.get("GROQ_API_KEY")
 
-# 2. Если её нет (локальный запуск в VS Code), берем ключ из кода.
-# ПЕРЕД ПУБЛИКАЦИЕЙ НА GITHUB РЕКОМЕНДУЕТСЯ УДАЛИТЬ СТРОКУ НИЖЕ ИЛИ СДЕЛАТЬ РЕПОЗИТОРИЙ ПРИВАТНЫМ!
+# 2. Если запускаем локально в VS Code, используем твой новый ключ
 if not api_key:
-    api_key = "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"
+    api_key = "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"
 
-# Инициализируем ИИ-клиента
+# Инициализируем клиента Groq
 client = Groq(api_key=api_key)
 
 @app.route('/', methods=['GET', 'POST'])
@@ -54,9 +53,6 @@ def home():
     return render_template('index.html', result=result)
 
 if __name__ == '__main__':
-    # Render автоматически передает свой порт в переменную окружения PORT.
-    # Если мы запускаем локально, то используем стандартный порт 5000.
+    # Настройка портов для корректной работы и на ПК, и на Render
     port = int(os.environ.get("PORT", 5000))
-    
-    # На Render сервер должен слушать '0.0.0.0', чтобы принимать внешние запросы
     app.run(host='0.0.0.0', port=port, debug=True)
