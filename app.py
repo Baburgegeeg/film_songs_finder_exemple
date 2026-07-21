@@ -38,7 +38,7 @@ def home():
             try:
                 # Запрос к модели Gemini 3.5 Flash
                 response = client.models.generate_content(
-                    model='gemini-3.5-flash',
+                    model='gemini-2.5-flash',
                     contents=user_request,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
