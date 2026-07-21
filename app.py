@@ -10,7 +10,7 @@ api_key = os.environ.get("GEMINI_API_KEY")
 
 # 2. Если запускаем локально в VS Code, используем ваш ключ
 if not api_key:
-    api_key = "AQ.Ab8RN6KwR6nAFkCfRMXDNyMaatEnzr0zm-Wv-4_AqC6gI_nHLg"
+    api_key = "AIzaSyAhBAmicJHCz6i6bYHvsmuDM7RVUy_MoXw"
 
 # Инициализируем клиента Gemini API
 client = genai.Client(api_key=api_key)
@@ -38,7 +38,7 @@ def home():
             try:
                 # Запрос к модели Gemini 3.5 Flash
                 response = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-3.5-flash',
                     contents=user_request,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
