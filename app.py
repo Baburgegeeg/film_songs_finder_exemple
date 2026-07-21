@@ -1,63 +1,77 @@
 import os
+import json
+import urllib.parse
 from flask import Flask, render_template, request
 from google import genai
 from google.genai import types
 
 app = Flask(__name__)
 
-# 1. Проверяем переменную окружения (для хостинга Render)
+# Считываем ключ из переменной окружения GEMINI_API_KEY
 api_key = os.environ.get("GEMINI_API_KEY")
+client = genai.Client(api_key=api_key) if api_key else None
 
-# 2. Если запускаем локально в VS Code, используем ваш ключ
-if not api_key:
-    api_key = "AIzaSyAhBAmicJHCz6i6bYHvsmuDM7RVUy_MoXw"
+# Системные инструкции для получения строгого JSON от модели
+SYSTEM_INSTRUCTION = """
+You are an expert music curator. 
+Analyze the user's described mood, genre preference, or vibe and suggest 5 matching songs.
 
-# Инициализируем клиента Gemini API
-client = genai.Client(api_key=api_key)
+CRITICAL INSTRUCTION:
+You MUST reply ONLY with a valid JSON array of objects. Do not include markdown code blocks (like ```json), do not include any intro or outro text.
 
-# Системная инструкция для модели
-SYSTEM_INSTRUCTION = (
-"You are an expert in movie soundtracks and music. The user will describe "
-    "a movie and a scene. Your task is to identify the most likely songs playing "
-    "in that scene. "
-    "CRITICAL INSTRUCTIONS:\n"
-    "1. Respond strictly in English.\n"
-    "2. For every song you suggest, you MUST provide a clickable HTML hyperlink to Spotify search. "
-    'Use this exact format for links: <a href="https://open.spotify.com/search/Song%20Name%20Artist%20Name" target="_blank">Listen on Spotify </a>\n'
-    "3. Replace 'Song%20Name%20Artist%20Name' in the URL with the actual song title and artist, using '%20' instead of spaces.\n"
-    "4. Keep your response concise, polite, and well-formatted."
-)
+Format example:
+[
+  {"artist": "Artist Name", "title": "Song Title", "genre": "Genre"},
+  {"artist": "Artist Name 2", "title": "Song Title 2", "genre": "Genre 2"}
+]
+"""
 
 @app.route('/', methods=['GET', 'POST'])
-def home():
-    result = None
+def index():
+    tracks = []
+    error = None
+    user_prompt = ""
+
     if request.method == 'POST':
-        user_request = request.form.get('user_request')
+        user_prompt = request.form.get('vibe', '').strip()
         
-        if user_request:
+        if not user_prompt:
+            error = "Пожалуйста, опишите ваше настроение или желаемый вайб."
+        elif not client:
+            error = "API ключ Gemini не настроен. Пожалуйста, добавьте GEMINI_API_KEY в переменные окружения (Environment) на Render."
+        else:
             try:
-                # Запрос к модели Gemini 3.5 Flash
+                # Запрос к нейросети Gemini
                 response = client.models.generate_content(
                     model='gemini-3.5-flash',
-                    contents=user_request,
+                    contents=f"Generate a 5-song playlist for this mood/vibe: {user_prompt}",
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
-                    ),
+                        temperature=0.7,
+                        response_mime_type="application/json"
+                    )
                 )
-                
-                result = response.text
-                
+
+                # Разбор полученного JSON-ответа
+                raw_data = json.loads(response.text)
+
+                # Формирование ссылок для поиска в Spotify и YouTube
+                for item in raw_data:
+                    query = f"{item['artist']} {item['title']}"
+                    encoded_query = urllib.parse.quote(query)
+                    
+                    tracks.append({
+                        'artist': item.get('artist', 'Unknown Artist'),
+                        'title': item.get('title', 'Unknown Title'),
+                        'genre': item.get('genre', 'Music'),
+                        'spotify_url': f"[https://open.spotify.com/search/](https://open.spotify.com/search/){encoded_query}",
+                        'youtube_url': f"[https://www.youtube.com/results?search_query=](https://www.youtube.com/results?search_query=){encoded_query}"
+                    })
+
             except Exception as e:
-                result = f"An error occurred while connecting to the AI: {e}"
+                error = f"Ошибка при генерации плейлиста: {str(e)}"
 
-    return render_template('index.html', result=result)
-
-if __name__ == '__main__':
-    # Настройка портов для корректной работы и локально, и на Render
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    return render_template('index.html', tracks=tracks, error=error, user_prompt=user_prompt)
 
 if __name__ == '__main__':
-    # Настройка портов для корректной работы и на ПК, и на Render
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(debug=True)
